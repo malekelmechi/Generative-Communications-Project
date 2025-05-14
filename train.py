@@ -23,7 +23,7 @@ parser.add_argument('--dff', default=512, type=int)
 parser.add_argument('--num-layers', default=4, type=int)
 parser.add_argument('--num-heads', default=8, type=int)
 parser.add_argument('--batch-size', default=128, type=int)
-parser.add_argument('--epochs', default=200, type=int)
+parser.add_argument('--epochs', default=100, type=int)
 
 # Device
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -49,8 +49,8 @@ def clean_previous_runs():
         shutil.rmtree("checkpoints")
         print("🧹 Dossier 'checkpoints' supprimé.")
 
-# Sauvegarder la loss moyenne
-def save_losses(cross_entropy_losses, epoch):
+# Sauvegarder les deux losses
+def save_losses(epoch, loss_lr1, loss_lr2):
     os.makedirs("losses", exist_ok=True)
     loss_file = 'losses/losses.json'
     if os.path.exists(loss_file):
@@ -58,23 +58,23 @@ def save_losses(cross_entropy_losses, epoch):
             all_losses = json.load(f)
     else:
         all_losses = []
-    avg_loss = float(np.mean(cross_entropy_losses))
     all_losses.append({
         "epoch": epoch,
-        "cross_entropy_loss": avg_loss
+        "loss_lr_0.001": loss_lr1,
+        "loss_lr_0.002": loss_lr2
     })
     with open(loss_file, 'w') as f:
         json.dump(all_losses, f, indent=4)
-    print(f"💾 Loss (avg) sauvegardée pour epoch {epoch}: {avg_loss:.4f}")
+    print(f"💾 Losses sauvegardées pour epoch {epoch}: LR=0.001: {loss_lr1:.4f}, LR=0.002: {loss_lr2:.4f}")
 
 # Entraînement principal
-def train(epoch, args, net):
+def train(epoch, args, net, optimizer, criterion, pad_idx, lr_value):
     net.train()
     train_eur = EurDataset('train')
     print(f"📦 Train dataset chargé avec {len(train_eur)} échantillons")
     train_iterator = DataLoader(train_eur, batch_size=args.batch_size, num_workers=0,
                                 pin_memory=True, collate_fn=collate_data)
-    pbar = tqdm(train_iterator, desc=f'[Epoch {epoch+1}] Device: {device}')
+    pbar = tqdm(train_iterator, desc=f'[Epoch {epoch+1}] LR: {lr_value} | Device: {device}')
     cross_entropy_losses = []
     for sents in pbar:
         sents = sents.to(device)
@@ -86,11 +86,12 @@ def train(epoch, args, net):
             'LR': f"{optimizer.param_groups[0]['lr']:.5f}"
         })
         cross_entropy_losses.append(ce_loss.item())
-    save_losses(cross_entropy_losses, epoch)
+    avg_loss = float(np.mean(cross_entropy_losses))
+    return avg_loss
 
 # Point d'entrée principal
 if __name__ == '__main__':
-    args = parser.parse_args()
+    args = parser.parse_args([])  # [] nécessaire pour Jupyter/Notebook
 
     # Nettoyage
     clean_previous_runs()
@@ -121,22 +122,25 @@ if __name__ == '__main__':
     # Créer répertoire checkpoints
     os.makedirs(args.checkpoint_path, exist_ok=True)
 
-    # Phase 1 : LR = 0.001
-    for epoch in range(100):
+    # Entraînement avec les deux LR à chaque époque
+    for epoch in range(args.epochs):
+        # LR = 0.001
         for g in optimizer.param_groups:
             g['lr'] = 0.001
-        print(f"🚀 Phase 1 | Epoch {epoch+1}/200 | LR = 0.001")
-        train(epoch, args, deepsc)
-        checkpoint_file = os.path.join(args.checkpoint_path, f"checkpoint_epoch_{epoch+1}.pth")
-        torch.save(deepsc.state_dict(), checkpoint_file)
-        print(f"✅ Checkpoint sauvegardé : {checkpoint_file}")
+        print(f"🚀 Epoch {epoch+1} | Phase 1 | LR = 0.001")
+        loss_1 = train(epoch, args, deepsc, optimizer, criterion, pad_idx, 0.001)
+        checkpoint_file_1 = os.path.join(args.checkpoint_path, f"checkpoint_epoch_{epoch+1}_lr_0.001.pth")
+        torch.save(deepsc.state_dict(), checkpoint_file_1)
+        print(f"✅ Checkpoint sauvegardé : {checkpoint_file_1}")
 
-    # Phase 2 : LR = 0.002
-    for epoch in range(100, 200):
+        # LR = 0.002
         for g in optimizer.param_groups:
             g['lr'] = 0.002
-        print(f"🚀 Phase 2 | Epoch {epoch+1}/200 | LR = 0.002")
-        train(epoch, args, deepsc)
-        checkpoint_file = os.path.join(args.checkpoint_path, f"checkpoint_epoch_{epoch+1}.pth")
-        torch.save(deepsc.state_dict(), checkpoint_file)
-        print(f"✅ Checkpoint sauvegardé : {checkpoint_file}")
+        print(f"🚀 Epoch {epoch+1} | Phase 2 | LR = 0.002")
+        loss_2 = train(epoch, args, deepsc, optimizer, criterion, pad_idx, 0.002)
+        checkpoint_file_2 = os.path.join(args.checkpoint_path, f"checkpoint_epoch_{epoch+1}_lr_0.002.pth")
+        torch.save(deepsc.state_dict(), checkpoint_file_2)
+        print(f"✅ Checkpoint sauvegardé : {checkpoint_file_2}")
+
+        # Enregistrer les deux losses
+        save_losses(epoch + 1, loss_1, loss_2)
