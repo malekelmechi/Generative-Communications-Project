@@ -15,8 +15,7 @@ from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--vocab-file', default='data/vocab.json', type=str)
-parser.add_argument('--checkpoint-path', default='checkpoints/deepsc-Rayleigh', type=str)
-parser.add_argument('--channel', default='Rayleigh', type=str, help='Please choose AWGN, Rayleigh, and Rician')
+parser.add_argument('--checkpoint-path', default='checkpoints/deepsc-NoChannel', type=str)
 parser.add_argument('--MAX-LENGTH', default=30, type=int)
 parser.add_argument('--MIN-LENGTH', default=4, type=int)
 parser.add_argument('--d-model', default=128, type=int)
@@ -45,19 +44,19 @@ def validate(epoch, args, net):
     with torch.no_grad():
         for sents in pbar:
             sents = sents.to(device)
-            loss = val_step(net, sents, sents, 0.1, pad_idx,
-                            criterion, args.channel)
+            loss = val_step(net, sents, sents, pad_idx,
+                            criterion)
             total += loss
             pbar.set_description(f'Epoch: {epoch + 1}; Type: VAL; Loss: {loss:.5f}')
     return total / len(test_iterator)
 
 def train(epoch, args, net, mi_net=None):
     train_eur = EurDataset('train')
-    print(f"✅ Loaded train dataset with {len(train_eur)} samples")  # ← Debug ligne 1
+    print(f" Loaded train dataset with {len(train_eur)} samples")  
 
     train_iterator = DataLoader(train_eur, batch_size=args.batch_size, num_workers=0,
                                 pin_memory=True, collate_fn=collate_data)
-    print("✅ Created DataLoader")  # ← Debug ligne 2
+    print(" Created DataLoader") 
 
     pbar = tqdm(train_iterator)
 
@@ -80,12 +79,11 @@ def train(epoch, args, net, mi_net=None):
 if __name__ == '__main__':
     args = parser.parse_args()
 
-    # Charger le vocabulaire
+
     vocab_path = os.path.join(os.path.dirname(__file__), args.vocab_file)
     with open(vocab_path, 'r', encoding='utf-8') as f:
         vocab = json.load(f)
 
-    # S'assurer qu'on a bien le bon format
     token_to_idx = vocab.get("token_to_idx", vocab)
 
     num_vocab = len(token_to_idx)
@@ -93,7 +91,7 @@ if __name__ == '__main__':
     start_idx = token_to_idx.get("<START>", 1)
     end_idx = token_to_idx.get("<END>", 2)
 
-    # Modèle + optimiseur
+   
     deepsc = DeepSC(args.num_layers, num_vocab, num_vocab,
                     num_vocab, num_vocab, args.d_model, args.num_heads,
                     args.dff, 0.1).to(device)

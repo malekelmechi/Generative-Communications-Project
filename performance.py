@@ -1,10 +1,3 @@
-# !usr/bin/env python
-# -*- coding:utf-8 _*-
-"""
-@Author: Huiqiang Xie
-@File: performance.py
-@Time: 2021/4/1 11:48
-"""
 import os
 import json
 import torch
