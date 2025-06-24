@@ -1,5 +1,4 @@
 import os
-# ⚠️ Doit être avant les imports Transformers pour forcer PyTorch seulement
 os.environ["USE_TF"] = "0"
 
 import json

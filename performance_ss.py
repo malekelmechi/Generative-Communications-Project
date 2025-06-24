@@ -1,11 +1,3 @@
-# !usr/bin/env python
-# -*- coding:utf-8 _*-
-"""
-@Author: Toi
-@File: performance_ss.py
-@Role: Évaluation de la Similarité de phrases avec DeepSC et BERT
-"""
-
 import os
 import json
 import torch

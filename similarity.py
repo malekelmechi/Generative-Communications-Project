@@ -1,10 +1,9 @@
-# similarity.py
 import numpy as np
 from w3lib.html import remove_tags
 from sklearn.preprocessing import normalize
 
 from bert4keras.backend import keras
-from bert4keras.models import build_transformer_model  # ✅ Correction ici
+from bert4keras.models import build_transformer_model  
 from bert4keras.tokenizers import Tokenizer
 
 
